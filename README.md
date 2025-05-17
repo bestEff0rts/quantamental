@@ -14,13 +14,29 @@ For complex models combining 2 or more datasets Ridge Regression penalty contain
 Для сложных моделей, объединяющих 2 или более наборов данных, содержит параметры для slope^2 и всех параметров^2 за исключением у-intercept (не масштабируется по измерениям)
 
 Lasso(L1 Norm) Regression
+может удалить предиктор
+Minimizes: SSR + lambda*|slope|
 
-Elastic-Net Regression
+Elastic-Net Regression- separate lambdas for each penalty(L1;L2) -calculated using CV(cross validation))- different combinations
 =L1+L2 Penalty
-
+lambda1=1 lambda2=0 Lasso (pick 1 correlated predictor and eliminate others)
+lambda1=0 lambda2=1 Ridge (shrinks all the correlated paaremters together)
+lambda1>0 lambda2>0 Elastic-Net (groups and shrinks correlated variables' parameters and leaves them in equation or removes them all at once)
 Источники: Elements of Statistical Learning Hastie; Introduction to statistical learning in R
 
-cv glmnet
+library(glmnet) #generalized linear models
+cv glmnet- lambda*[alpha*Lasso Penalty+(1-alpha)*Ridge Penalty]
+alpha=0 Only Ridge; alpha=1 Only Lasso
+0<alpha<1 Elastic Net Regression
+Lambda=0 Least Squares/Maximum Likelihood
+Test different values for lambda and alpha
+
+10-Fold Cross Validation - default but 
+(Purged K-Fold CV:
+Разбиваем данные на K блоков по времени
+Добавляем "очищающий" период (purged) между train и test)
+[ Train Fold 1 ] | [ Purge ] | [ Test Fold 1 ] |........ [ Test Fold k] 
+
 \\\\\\Добавление визуализации
 Lasso может обнулить фактор(предиктор) то есть его исключить, Ridge- нет
 При построении графика x-axis slope values; y-axis- penalty; Ridge- парабола с преломлением в нуле при увеличении lambda; Lasso- нет преломления в нуле
