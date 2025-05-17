@@ -51,6 +51,7 @@ for (i in 0:50) {
   results <- rbind(results, temp)
 }
 results
+#сравнение по mse т к linear regression; logistic regression- family='binomial'; type.measure='deviance'; likelohood instead or ssr
 #MSE для разных alpha
 mseplot <- ggplot(results, aes(x=alpha, y=mse)) +
   geom_line(color="steelblue", size=1.2) +
