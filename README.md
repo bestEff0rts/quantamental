@@ -13,5 +13,14 @@ For complex models combining 2 or more datasets Ridge Regression penalty contain
 Когда регрессия Ridge применяется к логистической регрессии, она оптимизирует сумму вероятностей не ssr (сумма квадратичных остатков)
 Для сложных моделей, объединяющих 2 или более наборов данных, содержит параметры для slope^2 и всех параметров^2 за исключением у-intercept (не масштабируется по измерениям)
 
+Lasso(L1 Norm) Regression
+
+Elastic-Net Regression
+=L1+L2 Penalty
+
 Источники: Elements of Statistical Learning Hastie; Introduction to statistical learning in R
 
+cv glmnet
+\\\\\\Добавление визуализации
+Lasso может обнулить фактор(предиктор) то есть его исключить, Ridge- нет
+При построении графика x-axis slope values; y-axis- penalty; Ridge- парабола с преломлением в нуле при увеличении lambda; Lasso- нет преломления в нуле
