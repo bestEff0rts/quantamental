@@ -1,2 +1,2 @@
-# quantamental
-ML + classical econoometric models
+ML + econometrics
+
