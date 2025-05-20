@@ -48,17 +48,16 @@ table(lr.pred, Direction.2005)
 mean(lr.pred==Direction.2005)
 mean(lr.pred!=Direction.2005)
 # that is TEST ERROR rate =52% :( 
+#intension is to [add more parameters] and use l1/l1/elastic net(alpha~0.5) to shrink parameters
 library("glmnet")
 
 x.test<- data.matrix(Smarket[,-9])
 y.test<-as.factor(data.matrix(Smarket.2005[,9]))
 head(x)
 
-x.train<-[,-9]
-x.test<-Smarket.2005
+#x.train<-[,-9]
+#x.test<-Smarket.2005
 
-y.train<-y[train_rows]
-y.test<-y[-train_rows]
 
 lr1.fit<-cv.glmnet(x,y, type.measure ="deviance", aplha=0.5, family="binomial")
 lr1.predicted<-predict(lr1.fit,s=lr1.fit$lambda.1se, newx=x.test)
