@@ -1,0 +1,107 @@
+---
+title: "Regularization: (L2) Ridge Regression and (L1) the Lasso"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(glmnet)
+require(ISLR)
+```
+
+## убрать NA
+```{r}
+Hitters=na.omit(Hitters)
+sum(is.na(Hitters))
+```
+
+## Including Code
+
+model.matrix creates a design (or model) matrix, e.g., by expanding factors to a set of dummy variables (depending on the contrasts) and expanding interactions similar
+
+#Используем Lasso и Ridge чтобы прогнозировать Salary 
+
+```{r}
+x=model.matrix(Salary~.,Hitters)[,-1]
+y=Hitters$Salary
+```
+
+## glmnet()
+The glmnet() function has an alpha argument that determines what type of model is fit. If alpha=0 then a ridge regression model is fit, and if alpha=1 then a lasso model is fit. 
+
+```{r}
+library(glmnet)
+grid=10^seq(10,-2,length=100)
+ridge.mod=glmnet(x,y,alpha=0,lambda=grid)
+dim(coef(ridge.mod))
+```
+Associated with each value of λ is a vector of ridge regression coefficients,
+ stored in a matrix that can be accessed by coef(). 
+```{r}
+ridge.mod$lambda[50]
+coef(ridge.mod)[,50]
+sqrt(sum(coef(ridge.mod)[-1,50]^2))
+```
+ Ожидаемо,оценки коэффициентов гораздо меньше (L2norm)
+ при использовании большого значения λ, в сравнении с малым значением λ.
+ 
+ Напротив, вот коэффициенты, когда λ=705, вместе с их L2 Norm. Большая L2 Norm коэффициентов associated with меньшее значение λ.
+
+```{r}
+ridge.mod$lambda[60]
+coef(ridge.mod)[,60]
+sqrt(sum(coef(ridge.mod)[-1,60]^2))
+```
+# predict() for a new value
+```{r}
+predict(ridge.mod,s=50,type="coefficients")[1:20,]
+```
+##We now split the samples into a training set and a test set in order
+ to estimate the test error of ridge regression and the lasso. 
+```{r}
+set.seed(1)
+train=sample(1:nrow(x), nrow(x)/2)
+test=(-train)
+y.test=y[test]
+```
+ 
+#Next we fit a ridge regression model on the training set, and evaluate
+ its MSE on the test set, using λ = 4.
+```{r}
+ ridge.mod=glmnet(x[train,],y[train],alpha=0,lambda=grid,
+ thresh=1e-12)
+ ridge.pred=predict(ridge.mod,s=4,newx=x[test,])
+ mean((ridge.pred-y.test)^2)
+```
+That is the test MSE
+# CV: instead of arbitrarily choosing λ = 4,
+it would be better to use cross-validation to choose the tuning parameter λ. built-in cross-validation function, cv.glmnet(). 
+```{r}
+set.seed(1)
+cv.out=cv.glmnet(x[train,],y[train],alpha=0)
+plot(cv.out)
+bestlam=cv.out$lambda.min
+bestlam
+```
+
+```{r}
+ridge.pred=predict(ridge.mod,s=bestlam,newx=x[test,])
+mean((ridge.pred-y.test)^2)
+
+ridge.pred4=predict(ridge.mod,s=4,newx=x[test,])
+mean((ridge.pred4-y.test)^2)
+```
+#improvement!
+This represents a further improvement over the test MSE that we got using
+ λ = 4. 
+#Finally, we refit our ridge regression model on the full data set,
+ using the value of λ chosen by cross-validation, and examine the coefficient estimates
+```{r}
+out=glmnet(x,y,alpha=0)
+predict(out,type="coefficients",s=bestlam)[1:20,]
+```
+#As expected
+none of the coefficients ar ezero—ridge regression does not
+ perform variable selection:)
+ 
+
