@@ -1,0 +1,57 @@
+---
+title: "CLassificators: Decision Trees, RF"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#FittingRegressionTrees
+```{r}
+library(MASS)
+library(ISLR)
+set.seed(1)
+names(Boston)
+```
+1- Create a TRAIN and TEST data sets
+(and fit the tree to the traning data)
+```{r}
+train = sample(1:nrow(Boston), nrow(Boston)/2)
+boston.tree<-tree(medv~.,Boston, subset=train)
+summary(boston.tree)
+```
+#Интерпретация 
+В контексте regresion tree, deviance является просто суммой квадратов ошибок для дерева.
+```{r}
+plot(boston.tree)
+text(boston.tree, pretty=0)
+
+```
+#Интерпретация
+Дерево указывает, что более низкие значения lstat соответствуют более дорогим домам.(rm>=7.553 и lstat<14.405)
+#Tree Pruning
+Now we use the cv.tree() function to see whether pruning the tree will
+ improve performance.
+```{r}
+cv.boston=cv.tree(boston.tree)
+plot(cv.boston$size,cv.boston$dev,type='b')
+```
+ In this case, the most complex tree is selected by cross-validation. How
+ever, if we wish to prune the tree, we could do so as follows, using the
+ prune.tree() function:
+```{r}
+prune.boston<-prune.tree(boston.tree,best=5)
+plot(prune.boston)
+# text(prune.boston, pretty=0)
+```
+ В соответствии с результатами CV, используем unpruned дерево для прогнозов по test dataset.
+```{r}
+yhat=predict(boston.tree,newdata=Boston[-train,])
+boston.test=Boston[-train,"medv"]
+plot(yhat,boston.test)
+mean((yhat-boston.test)^2)
+```
+ 
+ 
+ 
