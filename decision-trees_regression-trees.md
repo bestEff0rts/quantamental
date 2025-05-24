@@ -1,0 +1,92 @@
+CLassificators: Decision Trees, RF
+================
+
+\#FittingRegressionTrees
+
+``` r
+library(MASS)
+library(ISLR)
+library(tree)
+set.seed(1)
+names(Boston)
+```
+
+    ##  [1] "crim"    "zn"      "indus"   "chas"    "nox"     "rm"      "age"    
+    ##  [8] "dis"     "rad"     "tax"     "ptratio" "black"   "lstat"   "medv"
+
+1- Create a TRAIN and TEST data sets (and fit the tree to the traning
+data)
+
+``` r
+train = sample(1:nrow(Boston), nrow(Boston)/2)
+boston.tree<-tree(medv~.,Boston, subset=train)
+summary(boston.tree)
+```
+
+    ## 
+    ## Regression tree:
+    ## tree(formula = medv ~ ., data = Boston, subset = train)
+    ## Variables actually used in tree construction:
+    ## [1] "rm"    "lstat" "crim"  "age"  
+    ## Number of terminal nodes:  7 
+    ## Residual mean deviance:  10.38 = 2555 / 246 
+    ## Distribution of residuals:
+    ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+    ## -10.1800  -1.7770  -0.1775   0.0000   1.9230  16.5800
+
+\#Интерпретация В контексте regresion tree, deviance является просто
+суммой квадратов ошибок для дерева.
+
+``` r
+plot(boston.tree)
+text(boston.tree, pretty=0)
+```
+
+![](decision-trees_regression-trees_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+\#Интерпретация Дерево указывает, что более низкие значения lstat
+соответствуют более дорогим домам.(rm\>=7.553 и lstat\<14.405) \#Tree
+Pruning Now we use the cv.tree() function to see whether pruning the
+tree will improve performance.
+
+``` r
+cv.boston=cv.tree(boston.tree)
+plot(cv.boston$size,cv.boston$dev,type='b')
+```
+
+![](decision-trees_regression-trees_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+In this case, the most complex tree is selected by cross-validation. How
+ever, if we wish to prune the tree, we could do so as follows, using the
+prune.tree() function:
+
+``` r
+prune.boston<-prune.tree(boston.tree,best=5)
+plot(prune.boston)
+```
+
+![](decision-trees_regression-trees_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+
+``` r
+# text(prune.boston, pretty=0)
+```
+
+В соответствии с результатами CV, используем unpruned дерево для
+прогнозов по test dataset.
+
+``` r
+yhat=predict(boston.tree,newdata=Boston[-train,])
+boston.test=Boston[-train,"medv"]
+plot(yhat,boston.test)
+```
+
+![](decision-trees_regression-trees_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+``` r
+mean((yhat-boston.test)^2)
+```
+
+    ## [1] 35.28688
+
+\#Вывод Test Set MSE =35. Квадратный корень MSE, таким образом,
+составляет около 5,91, что указывает: модель приводит к test
+predictions, которые находятся в пределах около \$ 5,916 от истинной
+median value стоимости дома.
