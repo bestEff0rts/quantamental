@@ -5,8 +5,7 @@ Bootstrap
 
 X, Y- returns(random quantities) of 2 finanicial assets we wish to
 invest in; тогда alpha шт X; 1-alpha= Y; выберем такую alpha чтобы
-минимизировать риск( i.e. variance- волатильность(среднеквадратичное
-отклонение)^2) тогда
+минимизировать риск( i.e. variance) тогда
 $alpha= (Var(Y)-Cov(X,Y))/(Var(X)+Var(Y)-2Cov(X,Y))$
 
 Итог: цель- получить оценку alpha для минимизирования риска при
