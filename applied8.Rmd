@@ -1,0 +1,76 @@
+---
+title: "Applied#8"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##задача
+a classification tree was applied to the Carseats data set after converting Sales into a qualitative response variable. Now we will seek to *predict Sales using regression trees* and related approaches,treating the response as a *quantitative variable.*
+```{r}
+library(ISLR)
+library(MASS)
+library(tree)
+attach(Carseats)
+```
+
+#1  Split the data set into a training set and a test set
+```{r}
+train.set = sample(1:nrow(Carseats), nrow(Carseats)/2)
+test.set=! train.set
+```
+#2.Fit a regression tree to the training set.
+Plot the tree, and interpret the results. What test MSE do you obtain?
+```{r}
+reg.tree=tree(Sales~., data=Carseats, subset=train.set)
+summary(reg.tree)
+plot(reg.tree)
+text(reg.tree,pretty=0)
+```
+deviance is simply the sum of squared errors for the tree
+#Use cross-validation in order to determine the optimal level of
+ tree complexity. Does pruning the tree improve the test MSE?
+```{r}
+cv=cv.tree(reg.tree)
+plot(cv$size,cv$dev,type='b')
+```
+dev-corresponding to size error rate
+```{r}
+prune=prune.tree(reg.tree,best=5)
+plot(prune)
+text(prune,pretty=0)
+summary(prune)
+```
+significant decrease in test mse after pruning -Residual mean deviance:  4.41 = 860 / 195 
+#Use the bagging approach in order to analyze this data.
+What test MSE do you obtain? Use the importance() function to determine which variables are most important.
+**bagging = case of a random forest with m=p**
+```{r}
+library(randomForest)
+bag=randomForest(Sales~.,data=Carseats, subset=train.set, mtry=13, importance=TRUE)
+bag
+```
+*mtry=13* indicates that *all* 13 predictors should be considered
+ for each split of the tree —in other words, that bagging should be done.
+```{r}
+importance(bag)
+```
+#Use random forests to analyze this data. What test MSE do you
+ obtain? Use the importance() function to determine which vari
+ables are most important. Describe the effect of m,thenumberof
+ variables considered at each split, on the error rate
+ obtained.
+```{r}
+sales.rf=randomForest(Sales~., data=Carseats, subset=train.set, mtry=6, importance=TRUE)
+yhat.rf = predict(sales.rf,newdata=Carseats[-train.set,])
+Carseats.test=Carseats[-train.set,"Sales"]
+# fix(Carseats)
+mean((yhat.rf-Carseats.test)^2)
+```
+that's the test MSE
+```{r}
+importance(sales.rf)
+```
+
