@@ -1,0 +1,102 @@
+---
+title: "Методы снижения размерности признакового пространства. Dimension Reduction Methods(PCA, PCR, PLS)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Терминология
+Principal Components Analysis трансформирует признаки в их линейные комбинации и потом использует МНК(LS) в модели линейной регрессии с новыми признаками.
+Partial Least Squares явялется Supervised версией PCA т к учитывает Y response.
+
+Перед нужно *стандартизировать* признаки
+Это не feature selection methods, т к PC 1 direction и PLS 1 Direction являются **линейными** комбинациями ВСЕХ оригинальных предикторов
+PC 1 ортогонально(перпендикулярно) PC 2= линейная комбинация оргинальных признаков, которая не коррелирует с PC 1
+
+PC *Loading Scores*- пропорции каждого признака (коэффициенты прямой PC direction)
+*Eigen Vectors*- собственные значения вектора, единичный вектор PC 1
+*Eigen Values*- average of Sum of Squared Distances for best fitted PC line
+
+## Prinicpal Components Regression
+```{r pcr}
+library(pls)
+library(ISLR)
+attach(Hitters)
+Hitters=na.omit(Hitters)
+sum(is.na(Hitters))
+x<-model.matrix(Salary~.,Hitters)[,-1]
+y<-Hitters$Salary
+train=sample(1:nrow(x), nrow(x)/2)
+test=(-train)
+y.test=y[test]
+```
+*apply PCR to the Hitters data, in order to predict Salary*
+```{r}
+pcr.fit=pcr(Salary~.,data=Hitters,scale=TRUE, validation="CV")
+summary(pcr.fit)
+
+```
+
+ Setting scale=TRUE означает
+ has the effect of *standardizing* each
+ predictor
+ The CV score is provided for each possible number of components, ranging
+ from M =0onwards.
+ pcr() reports the root mean squared error; in order to obtain
+ the usual MSE, we must square this quantity. 
+```{r}
+validationplot(pcr.fit,val.type="MSEP")
+```
+#interpretation
+наим root mean square error при n of components=16;(m=19 - least squares)
+% of variance explained= amount of information about the predictors or
+ the response that is captured using M principal components
+ 
+Другими словами, если число M совпадает с числом p изначальных компонентов(предикторов), % of variance explained- 100%
+
+ 
+##perform PCR on the training data and evaluate its test set performance. 
+```{r}
+set.seed(1)
+pcr.fit1=pcr(Salary~., data=Hitters,subset=train,scale=TRUE,
+ validation="CV")
+validationplot(pcr.fit,val.type="MSEP")
+```
+Оказалось, что наименьшая cross-validation error при использовании M =7 компонент.
+Чтобы рассчитать *test MSE*:
+ 
+```{r}
+pred.pcr<-predict(pcr.fit,x[test,],ncomp=7)
+mean((pred.pcr-y.test)^2)
+```
+```{r}
+pcr.fit=pcr(y~x,scale=TRUE,ncomp=7)
+summary(pcr.fit)
+```
+## Patrial Least Squares
+```{r}
+set.seed(1)
+pls.fit<-plsr(Salary~., data=Hitters,subset=train,scale=TRUE,
+ validation="CV")
+summary(pls.fit)
+```
+Наименьшая cross-validation error- при only M=2 partial least squares directions 
+Чтобы оценить corresponding test set MSE.
+```{r}
+ pls.pred=predict(pls.fit,x[test,],ncomp=2)
+ mean((pls.pred-y.test)^2)
+```
+Test MSE PLS немного выше чем the test MSE PCR.
+Теперь PLS на полный датасет, используя M=2(полученное путем кросс-валидации)
+```{r}
+ pls.fit=plsr(Salary~., data=Hitters,scale=TRUE,ncomp=2)
+ summary(pls.fit)
+```
+ the percentage of variance in Salary that the two-component
+ PLS fit explains, 46.40%, is almost as much as that explained using the
+initial seven-component model PCR fit, 46.69%.
+Процент дисперсии Salary, которое PLS объясняет,- %, практически равен проценту объясненной 7-компонентной PCR моделью.( %)
+Это связано с тем, что PCR нацелен на максимизацию amount of variance объясненной предикторами,
+а PLS ищет направление которое объясняет variance и для предикторов и для response.
