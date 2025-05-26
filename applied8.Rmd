@@ -19,7 +19,7 @@ attach(Carseats)
 #1  Split the data set into a training set and a test set
 ```{r}
 train.set = sample(1:nrow(Carseats), nrow(Carseats)/2)
-test.set=! train.set
+test.set=Carseats[-train.set,]
 ```
 #2.Fit a regression tree to the training set.
 Plot the tree, and interpret the results. What test MSE do you obtain?
