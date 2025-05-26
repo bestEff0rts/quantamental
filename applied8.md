@@ -17,7 +17,7 @@ attach(Carseats)
 
 ``` r
 train.set = sample(1:nrow(Carseats), nrow(Carseats)/2)
-test.set=! train.set
+test.set=Carseats[-train.set,]
 ```
 
 \#2.Fit a regression tree to the training set. Plot the tree, and
