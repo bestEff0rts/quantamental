@@ -1,0 +1,104 @@
+---
+title: "Applied#9"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#This problem involves the OJ data set which is part of the ISLR package.
+```{r}
+library(ISLR)
+library(tree)
+attach(OJ)
+dim(OJ)
+```
+#1.Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+```{r}
+set.seed(2)
+train.set=sample(1:nrow(OJ), 800)
+OJ.test=OJ[-train.set,]
+dim(OJ)
+length(train.set)
+dim(OJ.test)
+```
+#2.Fit a tree to the training data, with Purchase as the response
+ and the other variables as predictors. Use the summary() function
+ to produce summary statistics about the tree, and describe the
+ results obtained. What is the training error rate? How many
+ terminal nodes does the tree have?
+```{r}
+tree.fit=tree(Purchase~., data=OJ, subset=train.set)
+summary(tree.fit)
+plot(tree.fit)
+text(tree.fit, pretty=0)
+```
+ training error rate=Residual mean deviance:  0.7463 = 591.8 / 793 
+ 7 terminal nodes
+#3.Type in the name of the tree object in order to get a detailed
+ text output. Pick one of the terminal nodes, and interpret the
+ information displayed.
+```{r}
+tree.fit
+```
+#5 Predict the response on the test data, and produce a confusion
+ matrix comparing the test labels to the predicted test labels.
+ What is the test error rate?
+```{r}
+yhat.tree = predict(tree.fit,newdata=OJ.test, type="class")
+pur.test=OJ[-train.set,"Purchase"]
+length(yhat.tree)
+length(pur.test)
+table(yhat.tree,pur.test)
+```
+Интерпретация confusion matrix: (событие А= Purchase CH; CH=Event,MM=No Event)
+test Error Rate=$(FP+FN)/(TP+TN+FP+FN)$=(69+43)/(114+69+43+44)=0.4148148
+TP Rate=$TP/(TP+FN)$=114/(114+43)=0.7261146
+FP Rate=$FP/(FP+TN)$=69/(69+44)=0.6106195
+Sensitivity=$TP/(TP+FN)$=114/(114+43)=0.7261146
+Specificity=$TN/(FP+TN)$=44/(44+69)=0.3893805
+ 
+*6*
+Apply the cv.tree() function to the training set in order to
+ determine the optimal tree size.
+ответ: 9- optimal tree size
+(g) Produce a plot with tree size on the x-axis and cross-validated
+ classification error rate on the y-axis.
+```{r}
+cv.oj=cv.tree(tree.fit)
+plot(cv.oj$size,cv.oj$dev,type='b')
+```
+ 
+ 9. This problem involves the OJ data set which is part of the ISLR
+ package.
+ (a) Create a training set containing a random sample of 800 obser
+vations, and a test set containing the remaining observations.
+ (b) Fit a tree to the training data, with Purchase as the response
+ and the other variables as predictors. Use the summary() function
+ to produce summary statistics about the tree, and describe the
+ results obtained. What is the training error rate? How many
+ terminal nodes does the tree have?
+ (c) Type in the name of the tree object in order to get a detailed
+ text output. Pick one of the terminal nodes, and interpret the
+ information displayed.
+ (d) Create a plot of the tree, and interpret the results.
+ (e) Predict the response on the test data, and produce a confusion
+ matrix comparing the test labels to the predicted test labels.
+ What is the test error rate?
+ (f) Apply the cv.tree() function to the training set in order to
+ determine the optimal tree size.
+ 
+ 
+ (h) Which tree size corresponds to the lowest cross-validated classification error rate? 
+ ответ: prunning wont improve results(residual deviance=cv error rate won't decrease)
+```{r}
+prune.oj=prune.tree(tree.fit,best=5)
+plot(prune.oj)
+text(prune.oj,pretty=0)
+summary(prune.oj)
+```
+
+ (i) Produce a pruned tree corresponding to the optimal tree size
+ obtained using cross-validation. If cross-validation does not lead
+ to selection of a pruned tree, then create a pruned tree with five
+ terminal nodes.
