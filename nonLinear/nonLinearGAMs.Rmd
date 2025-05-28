@@ -1,0 +1,97 @@
+---
+title: "GAMs"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+library(MASS)
+attach(Wage)
+```
+
+##задача wage~ year+age using natural spline, treating education as a qualitative predictor
+*1* lm()
+```{r}
+library(gam)
+gam.fit1= lm(wage~ns(year,4)+ns(age,5)+education, data=Wage)
+```
+т.к. это просто большая линейная регрессионная модель с использованием соответствующих basis functions, о исп функцию lm()
+*2*  Fit the model $wage=β0+f1(year)+f2(age)+f3(education)+\epsilon$ using smoothing splines
+```{r}
+gam.fit.m3=gam(wage~s(year,4)+s(age,5)+education,data=Wage)
+
+```
+ Функция s() из gam library= use a smoothing spline. 
+ функция year должна иметь 4 df(degrees of freedom),
+ функция age -5 df
+ Переменная education -qualitative,converted into four dummy variables.
+ Используем gam() to fit a GAM using these components. 
+ (all terms are fit simultaneously, taking each other into account to explain the response)
+*3* plot
+```{r}
+par(mfrow=c(1,3))
+plot(gam.fit.m3, se=TRUE,col="blue")
+plot.Gam(gam.fit1, se=TRUE, col="red")
+```
+*4* ANOVA
+```{r}
+gam.fit.m1=gam(wage~s(age,5)+education,data=Wage)
+gam.fit.m2=gam(wage~year+s(age,5)+education,data=Wage)
+anova(gam.fit.m1, gam.fit.m2,gam.fit.m3,test="F")
+```
+($H~0$: M0- простая модель- адекватна)
+Чтобы выбрать между тремя моделями 
+$M~1$ GAM без year; $M~2$ GAM usimg linear function of year; $M~3$ GAM using a spline function of year
+используем Analysis of Variance(ANOVA)
+$p-value=0.0001448 ***$ -> отвергаем нулевую гипотезу что M1 лучше M2 (GAM с линейной функцией года лучше, чем GAM, который не включает год вообще)
+$p-value=0.3485661$ -> нет оснований полагать, что линейная функция year необходима
+Вывод: основываясь на результатах ANOVA, модель M2 предпочтительна
+*5* summary()
+```{r}
+summary(gam.fit.m3)
+```
+Значения р-value для года и возраста соответствуют нулевой гипотезе линейной
+ взаимосвязи против альтернативы нелинейной связи
+Большие р-values для year соответствует выводу из ANOVA: линейная функция является адекватной для этого year
+Однако есть доказательства того, что для age необходим нелинейная функция.
+
+*6* predict()
+```{r}
+gam.pred=predict(gam.fit.m2,newdata=Wage)
+```
+
+#other possible GAM building blocks
+```{r}
+gam.lo.fit=gam(wage~s(year,df=4)+lo(age,span=0.7)+education,data=Wage)
+plot.Gam(gam.lo.fit, se=TRUE, col="pink", lwd=2)
+```
+Чтобы использовать local regression fits as building blocks in a GAM-*lo()*
+в примере используется local regression for the age term,with a span of 0.7
+
+*lo() to create interactions before calling gam()*
+```{r}
+gam.int.fit=gam(wage~lo(year,age,span=0.5)+education, data=Wage)
+```
+пример: two-term model, first term= interaction between year and age, fit by a local regression surface.
+*plot*
+```{r}
+library(akima)
+plot(gam.int.fit)
+```
+##fit a logistic regression GAM
+функция *I()*чтобы создать *binary response variable*+ family=binomial
+```{r}
+log.rg.gam=gam(I(wage>250)~year+s(age,df=5)+education,family="binomial",data=Wage)
+par(mfrow=c(1,3))
+plot(log.rg.gam,se=T,col="green")
+```
+```{r}
+table(education,I(wage>250))
+```
+fit a *logistic regression GAM* using all but this category
+```{r}
+gam.lr.s=gam(I(wage>250)~year+s(age,df=5)+education,family="binomial",data=Wage,subset=(education!="1. < HS Grad"))
+plot(gam.lr.s,se=T,col="green")
+```
+
