@@ -1,0 +1,54 @@
+---
+title: "NONLINEARapplied"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+library(gam)
+attach(Wage)
+library(e1071)
+library(boot)
+agelims=range(age)
+age.grid=seq(from=agelims[1],to=agelims[2])
+```
+
+## условие
+In this exercise, you will further analyze the Wage data set considered
+ throughout this chapter.
+ (a) Perform *polynomial regression* to predict wage using age.
+ Use cross-validation to select the optimal degree d for the polynomial.
+ What degree was chosen, and how does this compare to the results of hypothesis testing using ANOVA?
+ Make a plot ofthe resulting polynomial fit to the data.
+*1* fit wage~poly(age,d)+ select d via CV
+```{r polynom degree }
+library(boot)
+ set.seed(17)
+ cv.error.10=rep(0,10)
+ for (i in 1:10){
+ glm.fit=glm(wage~poly(age,i),data=Wage)
+ cv.error.10[i]=cv.glm(Wage,glm.fit,K=10)$delta[1]
+ }
+ cv.error.10
+```
+
+ 
+ 
+ 
+ (b) Fit a step function to predict wage using age, and perform cross
+validation to choose the optimal number of cuts. Make a plot of
+ the fit obtained.
+```{r step fun}
+table(cut(age,4))
+step.fit=lm(wage~cut(age,4),data=Wage)
+coef(summary(step.fit))
+```
+
+```{r}
+pred=predict(step.fit,newdata=list(age=age.grid),se=T)
+plot(age,wage,col="gray")
+lines(age.grid,pred$fit,lwd=2)
+```
+ 
+ 
