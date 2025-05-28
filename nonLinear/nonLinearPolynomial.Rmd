@@ -1,0 +1,141 @@
+---
+title: "non-linear models(Polynomial;Step Function)+ ANOVA для выбора степени полинома (альтернатива CV)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+attach(Wage)
+library(MASS)
+fix(Wage)
+```
+
+*1* Polynomial Regression and Step Functions
+```{r}
+poly.fit=lm(wage~poly(age,4), data=Wage)
+coef(summary(poly.fit))
+
+```
+Этот синтаксис соответствует линейной модели, используя функцию lm(), чтобы предсказать
+ размер, использующий полиномий четвертой степени в возрасте: poly(age,4)
+  Функция возвращает матрицу, столбцы которой являются основанием ортогональных полиномов, другими словами каждый столбец является линейным ортогональной комбинацией переменных age^1, age^2, age^3, age^4.
+```{r alternative fitting methods}
+poly.fit2a=lm(wage~age+I(age^2)+I(age^3)+I(age^4),data=Wage)
+coef(summary(poly.fit2a))
+# I(x^n)- wrapper or cbind()
+poly.fit2b=lm(wage~cbind(age,age^2,age^3,age^4),data=Wage)
+coef(summary(poly.fit2b))
+```
+*2* predict()
+```{r}
+age.limits=range(age)
+age.grid=seq(from=age.limits[1],to=age.limits[2])
+length(age.grid)
+
+poly.pred=predict(poly.fit,newdata=list(age=age.grid),se=TRUE)
+se=cbind(poly.pred$fit+2*poly.pred$se.fit,poly.pred$poly.fit-2*poly.pred$se.fit)
+length(se)
+
+```
+create a grid of values for age at which we want predictions
+*3* plot
+```{r}
+ par(mfrow=c(1,2),mar=c(4.5,4.5,1,1),oma=c(0,0,4,0))
+ plot(age,wage,xlim=age.limits,cex=.5,col="darkgrey")
+ title("Degree-4 Polynomial",outer=T)
+ lines(age.grid,poly.pred$fit,lwd=2,col="blue")
+ matlines(age.grid,se,lwd=1,col="red",lty=3)
+```
+plot the data and add the fit from the degree-4 polynomial.
+
+##Hypothesis testing: which degree of polynomial to choose? (alternative to CV)
+*1* fit models from linear to poly(age,5) and seek simplest model sufficient to explain wage and age relationship
+```{r}
+ln.fit= lm(wage~age, data=Wage)
+poly2.fit=lm(wage~poly(age,2), data=Wage)
+poly3.fit=lm(wage~poly(age,3), data=Wage)
+poly4.fit=lm(wage~poly(age,4), data=Wage)
+poly5.fit=lm(wage~poly(age,5), data=Wage)
+
+```
+
+*2* anova()
+```{r}
+anova(ln.fit,poly2.fit,poly3.fit,poly4.fit,poly5.fit)
+```
+
+analysis of variance using F-test, $H~0$: model $M~0$ is sufficient to explain the data 
+against the $H~1$ alternative hypothesis that a more complex model M2 is required.
+(netsed Models=  the predictors in M1 must be a  subset of the predictors in M2)
+*result*
+ The $p-value=< 2.2e-16$ comparing the linear Model 1 to the quadratic Model 2 is
+ essentially zero(<10−15)=linear fit is not sufficient (reject the null hypothesis $H~0$).
+ p-value comparing the quadratic Model 2 to the cubic Model 3 is very low ($0.001679 **$), so the quadratic fit is also insufficient.
+ The p-value comparing the cubic and degree-4 polynomials,Model 3 and Model 4,=$ 0.051046$,
+ while the degree-5 polynomial Model 5 seems unnecessary because its p-value is $0.37$.
+ 
+ Вывод:cubic or quadratic polynomial- reasonable fit to the data
+ 
+## Задача: predict whether an individual earns > $250,000 per year.
+*1*  create the appropriate response vector+apply the glm() function
+ using family="binomial" in order to fit a polynomial logistic regression
+ model
+```{r}
+bin.fit=glm(I(wage>250)~poly(age,4),data=Wage,family=binomial)
+```
+*2* predict()
+```{r}
+bin.pred=predict(bin.fit,newdata=list(age=age.grid),se=T)
+bin.fit
+```
+*3* transform to calculate confidence intervals
+```{r}
+pfit=exp(bin.pred$fit)/(1+exp(bin.pred$fit))
+se.bands.logit = cbind(bin.pred$fit+2*bin.pred$se.fit, bin.pred$fit-2*bin.pred$se.fit)
+se.bands = exp(se.bands.logit)/(1+exp(se.bands.logit))
+length(se.bands)
+length(age.grid)
+```
+we get predictions and standard errors for logit model ($log (Pr(Y =1|X)/(1 −Pr(Y =1|X)) =Xβ,$)
+in form of $X\hat β$
+to obtain confidence intervals for $Pr(Y =1|X)$, we use the transformation
+$Pr(Y =1|X)= exp(Xβ)/(1+exp(Xβ))$
+
+*4* plot()
+```{r}
+plot(age,I(wage>250),xlim=age.limits,type="n",ylim=c(0,.2))
+points(jitter(age), I((wage>250)/5),cex=.5,pch="|",col="darkgrey")
+lines(age.grid,pfit,lwd=2, col="blue")
+length(pfit)
+length(age.grid)
+length(se.bands)
+se1=se.bands[-c(64:126)]
+length(se1)
+lines(age.grid,se1,lwd=1,col="green",lty=3)
+```
+*Step function* fit
+```{r}
+table(cut(age,4))
+step.fit=lm(wage~cut(age,4),data=Wage)
+coef(summary(step.fit))
+```
+cut() автоматически выбирает $age$ cutpoints: 33.5; 49; 64.5 
+Функция cut() возвращает ordered categorical variable;
+Функция lm() создаетт set of dummy variables(фиктивные переменные) для регрессии.
+
+*predict()*
+```{r}
+step.pred=predict(step.fit, newdata=list(age=age.grid),se=T)
+
+```
+*plot()*
+```{r}
+par(mfrow=c(1,2),mar=c(4.5,4.5,1,1),oma=c(0,0,4,0))
+plot(age,wage,xlim=age.limits,cex=.5,col="darkgrey")
+title("Step Function",outer=T)
+lines(age.grid,step.pred$fit,lwd=2,col="blue")
+matlines(age.grid,se,lwd=3,col="green",lty=3)
+```
+
+
