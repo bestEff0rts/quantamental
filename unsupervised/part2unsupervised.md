@@ -1,0 +1,203 @@
+PART 2:unsupervised learning: Clustering
+================
+
+\##K-Means Clustering *алгоритм* (1)-Каждому из наблюдений случайным
+образом присваивается номер от 1 до K. Они служат в качестве начальных
+кластерных назначений для наблюдений. (2)-Повторять пока назначения
+кластеров не перестанут меняться: 2.1 Для каждого из K кластеров
+вычислите центроид кластера- это вектор средних значений p признаков для
+наблюдений в k-м кластере. 2.2 Назначьте каждое наблюдение кластеру,
+центр тяжести которого находится ближе всего (где ближайший определяется
+с использованием евклидова расстояния).
+
+*data generation*
+
+``` r
+ set.seed(2)
+ x=matrix(rnorm(50*2), ncol=2)
+ x[1:25,1]=x[1:25,1]+3
+ x[1:25,2]=x[1:25,2]-4
+ # plot(x)
+```
+
+*kmeans()*
+
+``` r
+km=kmeans(x,2,nstart=20)
+names(km)
+```
+
+    ## [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
+    ## [6] "betweenss"    "size"         "iter"         "ifault"
+
+``` r
+km$cluster
+```
+
+    ##  [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2
+    ## [39] 2 2 2 2 2 2 2 2 2 2 2 2
+
+km\$cluster- cluster assignments of 50 observations *plot*
+
+``` r
+plot(x, col=(km$cluster+1), main="K-Means Clustering Results with K=2", xlab="", ylab="", pch=20, cex=2)
+```
+
+![](part2unsupervised_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+наблюдения можно легко построить, поскольку они 2 Dimensional Если бы
+было больше двух переменных(2+ dimensiions), 1-выполнить PCA и
+2-построить первые два score vectors(вектора оценок главных компонентов)
+*K=3*
+
+``` r
+set.seed(4)
+km3=kmeans(x,3,nstart=20)
+km3
+```
+
+    ## K-means clustering with 3 clusters of sizes 17, 23, 10
+    ## 
+    ## Cluster means:
+    ##         [,1]        [,2]
+    ## 1  3.7789567 -4.56200798
+    ## 2 -0.3820397 -0.08740753
+    ## 3  2.3001545 -2.69622023
+    ## 
+    ## Clustering vector:
+    ##  [1] 1 3 1 3 1 1 1 3 1 3 1 3 1 3 1 3 1 1 1 1 1 3 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2
+    ## [39] 2 2 2 2 2 3 2 3 2 2 2 2
+    ## 
+    ## Within cluster sum of squares by cluster:
+    ## [1] 25.74089 52.67700 19.56137
+    ##  (between_SS / total_SS =  79.3 %)
+    ## 
+    ## Available components:
+    ## 
+    ## [1] "cluster"      "centers"      "totss"        "withinss"     "tot.withinss"
+    ## [6] "betweenss"    "size"         "iter"         "ifault"
+
+*plot*
+
+``` r
+ plot(x, col=(km3$cluster+1), main="K-Means Clustering Results with K=3", xlab="", ylab="", pch=20, cex=2)
+```
+
+![](part2unsupervised_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+*nstart*
+
+``` r
+set.seed(3)
+kmn=kmeans(x,3,nstart=1)
+kmn$tot.withinss
+```
+
+    ## [1] 97.97927
+
+``` r
+km.out=kmeans(x,3,nstart=20)
+km.out$tot.withinss
+```
+
+    ## [1] 97.97927
+
+Чтобы запустить функцию kmeans() с несколькими начальными
+назначениями(initial cluster assignmnets) кластера, мы используем
+nstart. Если используется значение Nstart \>1 , то кластер K-means будет
+выполнен с использованием множества случайных назначений в шаге 1
+алгоритма, а функция thekmeans() сообщит только о наилучших результатах
+km.out$tot.withinss = общее количество within-cluster sum of squares, цель K-means clustering- это знаечние минимизировать$minimize
+({/\|C~k\|\*(x~ij- x~i’j)^2})\$ начинать k-means с большим значением
+nstart, например, 20 или 50, поскольку в противном случае может быть
+достигнут нежелательный локальный оптимум.
+
+\##Hierarchial Clustering using single (одиночная связь). Расстояние
+между двумя кластерами — это минимальное расстояние между любыми двумя
+точками в кластерах. complete(полная связь). Расстояние между двумя
+кластерами — это максимальное расстояние между любыми двумя точками в
+кластерах. and average (средняя связь). Расстояние между двумя
+кластерами — это среднее расстояние между всеми парами точек в
+кластерах. *linkage clustering,with Euclidean distance as the
+dissimilarity measure*
+
+*1* hclust()
+
+``` r
+hc.complete=hclust(dist(x), method="complete")
+hc.average=hclust(dist(x), method="average")
+hc.single=hclust(dist(x), method="single")
+```
+
+функция dist() используется для вычисления матрицы евклидовых расстояний
+между наблюдениями размером 50×50. *2* plot dendrograms
+
+``` r
+par(mfrow=c(1,3))
+plot(hc.complete,main="Полная связь", xlab="", sub="", cex=.9)
+plot(hc.average, main="Средняя связь", xlab="", sub="", cex=.9)
+plot(hc.single, main="Одиночная связь", xlab="", sub="",cex=.9)
+```
+
+![](part2unsupervised_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+*cutree()*
+
+``` r
+cutree(hc.complete, 2)
+```
+
+    ##  [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2
+    ## [39] 2 2 2 2 2 2 2 2 2 2 2 2
+
+``` r
+cutree(hc.single, 2)
+```
+
+    ##  [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+    ## [39] 1 1 1 1 1 1 1 1 1 1 1 1
+
+``` r
+cutree(hc.average, 2)
+```
+
+    ##  [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 1 2 2 2 2 2
+    ## [39] 2 2 2 2 2 1 2 1 2 2 2 2
+
+Чтобы определить метки кластеров для каждого наблюдения, связанного с
+данным фрагментом dendogram- () Для этих данных, полная и постоянная
+связь разделяют наблюдения на соответствующие группы. Но одиночная связь
+идентифицирует одну точку как относящуюся к своему обственному
+кластеру.При выборе четырех кластеров(K=4) достигается приемлемый ответ,
+хотя в нем все еще остается два singletons
+
+``` r
+ cutree(hc.single, 4)
+```
+
+    ##  [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 1 3 3 3 3 3 3 3 3 3 3 3 3 3
+    ## [39] 3 3 3 4 3 3 3 3 3 3 3 3
+
+*scale()*
+
+``` r
+xsc=scale(x)
+plot(hclust(dist(xsc), method="complete"), main="Hierarchical Clustering with Scaled Features")
+```
+
+![](part2unsupervised_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+Чтобы масштабировать переменные до выполнения иерархической
+кластеризации наблюдений, мы используем функцию scale() *distance
+matrix*
+
+``` r
+x=matrix(rnorm(30*3), ncol=3)
+dd=as.dist(1-cor(t(x)))
+plot(hclust(dd, method="complete"), main="Complete Linkage with Correlation-Based Distance", xlab="", sub="")
+```
+
+![](part2unsupervised_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+Correlation-based distance (Расстояние на основе корреляции) может быть
+вычислено с помощью функции as.dist(), которая преобразует произвольную
+квадратную симметричную матрицу в форму, которую функция hclust()
+распознает как матрицу расстояний. Это имеет смысл только для данных,
+содержащих по крайней мере три признака,(то есть 3+ dimensions)
+поскольку абсолютная корреляция между любыми двумя наблюдениями и
+измерениями по двум признакам всегда равна 1.
