@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "RNN for predicting TIME SERIES"
 output: github_document
 editor_options: 
   markdown: 
@@ -13,8 +13,8 @@ knitr::opts_chunk$set(
 	message = FALSE,
 	warning = FALSE
 )
-install.packages("keras")
-keras::install_keras(method = "conda", python_version = "3.10")
+# install.packages("keras")
+# keras::install_keras(method = "conda", python_version = "3.10")
 ```
 
 ## time series prediction
@@ -22,6 +22,10 @@ keras::install_keras(method = "conda", python_version = "3.10")
 #1 - нужно настроить данные и стандартизировать каждую из переменных
 
 ```{r}
+library(keras)
+library(reticulate)
+library(magrittr)
+
 xdata <-data.matrix(NYSE[, c("DJ_return", "log_volume","log_volatility")])
 istrain <- NYSE[, "train"]
 xdata <-scale(xdata)
@@ -65,7 +69,7 @@ istrain <- istrain[-(1:5)]
  1-mean((arpred- arframe[!istrain, "log_volume"])^2) / V0
 ```
 
-теперь обучаем включая фактор day_of_week.
+теперь обучаем модель включая фактор day_of_week.
 
 ```{r}
 arframed <-data.frame(day = NYSE[-(1:5), "day_of_week"], arframe)
@@ -74,7 +78,7 @@ arpredd <-predict(arfitd, arframed[!istrain, ])
 1-mean((arpredd- arframe[!istrain, "log_volume"])^2) / V0
 ```
 
-чтобы обучить RNN, нужно изменить форму этих данных, т к ожидается
+чтобы обучить RNN(recurrent neural network), нужно изменить форму этих данных, т к ожидается
 последовательность из L =5 векторов характеристик X = {x ∈}L 1 для
 каждого наблюдения. Это lagged версии временных рядов
 
@@ -87,7 +91,7 @@ arpredd <-predict(arfitd, arframed[!istrain, ])
  dim(xrnn)
 ```
 
-4 этапа: 1-тизвлечь матрицу n×15 с lagged версиями трех
+4 этапа: 1-извлечь матрицу n×15 с lagged версиями трех
 переменных-предикторов из arframe. 2- преобразовать эту матрицу в массив
 n×3×5, изменив атрибут dimension, поскольку новый массив заполняется по
 столбцам. 3- изменение порядка lagged переменных, так что индекс 1
@@ -96,9 +100,9 @@ n×3×5, изменив атрибут dimension, поскольку новый 
 формат, ожидаемый модулем RNN в keras.
 
 ```{r message=FALSE, warning=FALSE}
-library(keras)
-library(reticulate)
-library(magrittr)
+# library(keras)
+# library(reticulate)
+# library(magrittr)
  model <- keras_model_sequential() %>%
  layer_simple_rnn(units = 12,
  input_shape = list(5, 3),
@@ -123,9 +127,9 @@ kpred <-predict(model, xrnn[!istrain,, ])
 приведенную выше команду keras_model_sequential() командой:
 
 ```{r}
- model <- keras_model_sequential() %>%
- layer_flatten(input_shape = c(5, 3)) %>%
- layer_dense(units = 1)
+ # model <- keras_model_sequential() %>%
+ # layer_flatten(input_shape = c(5, 3)) %>%
+ # layer_dense(units = 1)
 ```
 
 Здесь функция layer_flatten() просто берет входную последовательность и
