@@ -1,0 +1,73 @@
+---
+title: "poisson regression"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+data generation
+```{r}
+PD<-rpois(60, lambda = 5)
+PD
+data<-table(PD)
+```
+
+plot
+```{r}
+plot(data,cex.axis=0.6,xlab="Counts",ylab="Frequency of counts")
+```
+```{r}
+WPData<-as.data.frame(warpbreaks)
+str(WPData)
+summary(WPData)
+# fix(WPData)
+```
+Box plot (ящичный график)
+```{r}
+par(mfrow = c(1, 2))
+plot(breaks ~ tension, data = WPData, col = "pink",
+     varwidth = TRUE, subset = wool == "A", main = "Wool A",ylim=c(8,72))
+plot(breaks ~ tension, data = warpbreaks, col = "purple",
+     varwidth = TRUE, subset = wool == "B", main = "Wool B",ylim=c(8,72))
+
+```
+Разделим данные train test
+```{r}
+dim(WPData)
+train.indices= sample(nrow(WPData),round(0.75*nrow(WPData)),replace=FALSE)
+train.set=WPData[train.indices,]
+test.set=WPData[-train.indices,]
+# fix(test.set)
+```
+
+Обучим модель train data
+```{r}
+pr.fit1 <- glm(breaks ~ wool+tension, data = train.set, family=poisson)
+pr.fit1
+exp(coef(pr.fit1))
+exp(confint(pr.fit1))
+```
+
+```{r}
+Coef1<-coef(pr.fit1)
+Coef1[2]
+exp(Coef1[2])
+summary(pr.fit1)
+deviance(pr.fit1)/df.residual(pr.fit1)
+```
+
+добавим interaction term и обучим новую модель
+```{r}
+pr.fit2=glm(breaks~wool*tension, data = train.set, family=poisson)
+pr.fit2
+exp(coef(pr.fit2))
+exp(confint(pr.fit2))
+
+summary(pr.fit2)
+
+deviance(pr.fit2)/df.residual(pr.fit2)
+```
+
+
+
