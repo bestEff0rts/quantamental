@@ -1,0 +1,102 @@
+---
+title: "deeplearning2: A Single Layer Network"
+output: github_document
+---
+#Network Tuning
+1-Количество скрытых слоев и количество модулей в каждом слое.
+ Согласно современным представлениям, количество модулей в скрытом слое может
+быть большим, и перенастройкой можно управлять с помощью различных форм
+регуляризации.
+ 2- Параметры регуляризации. Они включают в себя частоту dropoout
+и силу λ регуляризации лассо и ridge и обычно устанавливаются отдельно на каждом уровне.
+ • SGD- сведения о стохастическом градиентном спуске. К ним относятся batch size,
+количество epochs и, если они используются, подробные сведения об увеличении объема данных(data augmentation)- analog to preventing overfitting by boosting- random sampling with repetition
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR2)
+library(ISLR)
+```
+# data setup
+```{r data setup}
+library(keras)
+library(reticulate)
+attach(Hitters)
+Hitters <-na.omit(Hitters)
+sum(is.na(Hitters))
+n <-nrow(Hitters)
+set.seed(13)
+ntest <-trunc(n / 3)
+testid <-sample(1:n, ntest)
+```
+# обучение линейной модели train data+ predict on test
+```{r}
+lr.fit=lm(Salary~., data=Hitters[-testid, ])
+lr.pred=predict(lr.fit, Hitters[testid, ])
+with(Hitters[testid, ], mean(abs(lr.pred- Salary)))
+```
+*with()*: первый аргумент - дата фрейм, второй - выражение, которое может ссылаться на элементы
+фрейма по имени. 
+В этом случае фрейм данных соответствует тестовым данным, и выражение вычисляет mae- среднюю абсолютную ошибку прогнозирования по этим данным.
+```{r}
+ x <-scale(model.matrix(Salary ~ .- 1, data = Hitters))
+ y <- Hitters$Salary
+```
+В первой строке выполняется вызов model.matrix(), который выдает ту же
+матрицу, которая использовалась lm() (в-1 пропущен intercept). Эта функция
+автоматически преобразует коэффициенты в фиктивные переменные. Функция scale()
+стандартизирует матрицу, поэтому каждый столбец имеет нулевое среднее значение и единицу дисперсии.
+```{r}
+ library(glmnet)
+cvfit <-cv.glmnet(x[-testid, ], y[-testid], type.measure = "mae")
+cpred <-predict(cvfit, x[testid, ], s = "lambda.min")
+mean(abs(y[testid]- cpred))
+```
+#Чтобы обучить нейросеть, сначала создаем модельную структуру, ее описывающую
+```{r}
+library(magrittr)
+library(keras)
+ nn.mod <-keras_model_sequential() %>%
+ layer_dense(units = 50, activation = "relu",
+ input_shape = ncol(x)) %>%
+ layer_dropout(rate = 0.4) %>%
+ layer_dense(units = 1)
+```
+
+pipe operator %>% - передает предыдущий термин
+в качестве первого аргумента следующей функции и возвращает результат.
+#характеристики nn.mod
+1 (hidden layer) скрытый слой с 50 скрытыми объектами и функцию активации ReLU.(rectified Linear Unit)
+Dropout layer- в котором случайные 40% из 50 активаций предыдущего слоя обнуляются во время каждой итерации алгоритма стохастического градиентного спуска
+Output layer- выходной уровень без функции активации, модель обеспечивает количественный
+output
+#добавим детали к nn.mod, контролирующие алгоритм обучения
+```{r}
+nn.mod %>% compile(loss = "mse",
+ optimizer = optimizer_rmsprop(),
+ metrics = list("mean_absolute_error")
+ )
+```
+оператор pipe передает nn.mod в качестве первого аргумента
+функции compile(). Функция compile() на самом деле не изменяет объект R- nn.mod , но она передает эти спецификации экземпляру python этой модели, который был создан по ходу работы.
+##обучение модели: на the training data+ указать two fitting parameters- epochs and batch_size.
+```{r}
+history <- nn.mod %>% fit(
+ x[-testid, ], y[-testid], epochs = 1500, batch_size = 32,
+ validation_data = list(x[testid, ], y[testid])
+)
+```
+
+batch_size= 32 значит на кажом этапе стохастического градиентного спсука алгоритм случайным обращом выбирает  32 training observations для вычисления градиента
+epoch - это количество шагов SGD(стохастический градиентный спуск), необходимых для обработки n наблюдений.
+т к в обучающем наборе n = 176, значение epoch равно 176/32 = 5,5 шагам SGD.
+more options for fitting - ?fit.keras.engine.training.Model.
+```{r}
+plot(history)
+```
+# predict from the final model, and evaluate its performance on the test data
+```{r}
+ npred <-predict(nn.mod, x[testid, ])
+ mean(abs(y[testid]- npred))
+```
+Из-за использования SGD результаты немного различаются при каждом
+использовании, а set.seed() не обеспечивает идентичные результаты (fitting выполняется на python), поэтому результаты будут немного отличаться.
