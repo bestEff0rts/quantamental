@@ -1,0 +1,136 @@
+---
+title: "ECONOMETRICS"
+output: github_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+df=read.csv("D:/data/all_stocks_5yr.csv")
+str(df)
+```
+#добавляем features- : R t  — это месячная простая доходность индекса
+```{r}
+library(quantmod)
+library(TTR)
+attach(df)
+
+df$Intraday.Return = (close - open)/open
+df$Range = (high - low)/low
+df$Close.Return = c(NA, diff(close)/close[-length(close)])
+
+df$Open.Return = c(NA, diff(open)/open[-length(open)])
+df$High.Return = c(NA, diff(high)/high[-length(high)])
+df$Low.Return = c(NA, diff(low)/low[-length(low)])
+df$Volume.Change = c(NA, diff(volume)/volume[-length(volume)])
+#скользящие средние
+df$SMA10 <- SMA(df$close, n = 10)
+df$SMA10 <- na.locf(df$SMA10, na.rm = FALSE)  # Заполнить последним известным значением
+df$SMA20 <- SMA(df$close, n = 20)
+df$SMA20 <- na.locf(df$SMA20, na.rm = FALSE)  # Заполнить последним известным значением
+#labels for classificators- бинарные сигналы (1 если цена выросла, 0 если упала)
+df$Price.Dir <- ifelse(df$Close.Return > 0, 1, 0)
+df$RSI14 <- RSI(df$close, n = 14)
+# MACD индикатор
+df$macd <- MACD(df$close)
+
+# df <- df[-1, ]
+str(df)
+str(df[20:40,])
+```
+```{r}
+data.subset=df[c(1:768),]
+str(data.subset)
+train.set=data.subset[c(1:512),]
+test.set=data.subset[c(512:768),]
+attach(df)
+is.factor(Price.Dir)
+lm.fit=lm(Intraday.Return~open+high+low+close+volume+Intraday.Return+Range+Close.Return+Open.Return+High.Return+Low.Return+Volume.Change+SMA10 +SMA20 +RSI14, data=test.set)
+summary(lm.fit)
+```
+```{r}
+attach(data.subset)
+lm.fit2=lm(Intraday.Return ~ open + close + Open.Return + High.Return + 
+   Volume.Change, data = test.set)
+summary(lm.fit2)
+```
+```{r}
+lm.fit3=lm(Intraday.Return ~ open+close+Open.Return+High.Return*
+    Volume.Change, data = test.set)
+summary(lm.fit3)
+```
+```{r}
+lm.fit4=lm(Intraday.Return ~ I(open^2) + I(close^2) + Open.Return + High.Return, data=test.set)
+summary(lm.fit4)
+```
+```{r}
+anova(lm.fit3,lm.fit4)
+```
+Model 2(lm.fit4) с quadratic term сильно лучше т к p-value< 2.2e-16 ***- из anova
+```{r}
+plot(lm.fit4)
+```
+
+
+##  Example 1.
+Consider the monthly simple returns of the CRSP equal-weighted index from January 1926 to December 2008 for 996 observations. 
+Denote the series by Rt. The sample par
+tial autocorrelationfunction(PACF)ofRt shows
+ significant serial correlations at lags 1 so
+ that an AR(1) model is used for the mean equation. 
+The squared series of the AR(3) residuals
+ suggests that the conditional heteroscedasticity
+ might depend on lags 1, 3 and 8 of the resid
+uals. Therefore, we employ the special bilinear
+ model
+```{r}
+Rt <- ts(df$Close.Return, frequency = 12)
+sum(is.na(Rt))
+Rt<-na.omit(Rt)
+# Rt <- ts(df, start=c(1,619040), frequency = 12)
+pacf=pacf(Rt, main = "PACF of Monthly Simple Returns")
+plot(pacf)
+```
+выходит за синие линии- пределы confidence intervals- p=1 (1 лаг)
+
+```{r}
+# Автоматический подбор порядка
+best_ar <- ar(Rt, method = "ols", order.max = 20)
+print(best_ar$order) # Рекомендуемый порядок AR
+
+# fit
+ar.fit <- arima(Rt, order = c(1, 0, 0))  # AR(3) # model <- ar(Rt, order.max = 3, method = "ols")
+names(ar.fit)
+ar.fit
+```
+
+```{r}
+#проверка residuals
+Box.test(ar.fit$residuals, lag = 20, type = "Ljung-Box")
+plot(ar.fit$residuals)
+# диагностический график
+
+par(mfrow = c(3, 1))
+plot.ts(ar.fit$residuals, main = "Standardized Residuals")
+acf(ar.fit$residuals, lag.max = 30, main = "ACF of Residuals")
+pacf(ar.fit$residuals, lag.max = 30, main = "PACF of Residuals")
+
+shapiro.test(ar.fit$residuals[1:5000])  # Проверка нормальности
+library(FinTS)
+ArchTest(ar.fit$residuals)  # Проверка ARCH-эффектов
+
+# График квантиль-квантиль
+qqnorm(ar.fit$residuals)
+qqline(ar.fit$residuals, col = "red")
+```
+Нормальность	W=0.69, p<2.2e-16	Не нормальное распределение	(преобразовать данные)
+Гетероскедастичность	p=1, χ²≈0	Однородная дисперсия (ARCH-тест:
+p-value = 1 ⇒ отсутствие ARCH-эффектов; Chi-squared ≈ 0 ⇒ нет кластеров волатильности)
+
+```{r}
+# predict
+ar.pred <- predict(ar.fit, n.ahead = 5)
+print(ar.pred)
+ar.pred$se
+names(ar.pred)
+```
+теперь сохраним predictions ar модели и ее residuals (для дальнейшего использования в ml моделях в качестве features/target variable)
