@@ -1,0 +1,203 @@
+---
+title: "WFCV.SMA"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+d1<-read.csv("D:/sp500eminif/CME_ESH2000.csv")
+d2=read.csv("D:/sp500eminif/CME_ESH2001.csv")
+d3=read.csv("D:/sp500eminif/CME_ESH2002.csv")
+d4=read.csv("D:/sp500eminif/CME_ESH2003.csv")
+d5=read.csv("D:/sp500eminif/CME_ESH2004.csv")
+d6=read.csv("D:/sp500eminif/CME_ESH2005.csv")
+d7=read.csv("D:/sp500eminif/CME_ESH2006.csv")
+
+
+data <- rbind(d1,d2,d3,d4,d6,d7)
+str(data)
+attach(data)
+sum(is.na(Close))
+```
+
+## Walkforward CV для подбора параметров на основе скользящих средних
+задача: найти лучше n, threshold для стратегии на скользящих средних
+стратегия — детерминированное правило (buy if ma_fast(5) > ma_slow(20) * (1 + threshold)
+гибрид SMA- скользящее окно, агрегирующее исторические цены.- и порогового классификатора( правило сигнала как бинарный margin classifier-Условие ma_fast > ma_slow * (1 + threshold) — 1 (покупать) если выполняется,0 (не торговать) иначе)
+Walk-Forward Validation-избегает look-ahead bias:
+Обучение: На каждом шаге используются только прошлые данные (t-window.size+1:t).
+Тестирование: Прогноз делается на одно наблюдение вперед (t+1). который корректно избегает look-ahead bias-Прогноз повторяется для всех t от window.size до n-1.
+Порог (threshold)- относительный % (например, 0.01 = 1%), на который ma_fast должна превышать ma_slow для генерации сигнала.
+Формула: ma_fast > ma_slow * (1 + threshold).
+Порог применяется к текущему значению SMA (не к доходности за период). Это фильтр для входа в сделку.
+```{r}
+library(TTR)
+library(PerformanceAnalytics)
+
+window.size=126
+param.grid=expand.grid(n.fast=c(5,10), n.slow=c(20,50), threshold=c(0.01,0.02))
+best.sharpe=-Inf
+best.param=list()
+sum(is.na(data$Close))
+for (i in 1:nrow(param.grid)) {
+  sharpe.list=c()
+  for (t in window.size:(nrow(data)-1))
+{ 
+  #fit
+  train.set=(data[(t-window.size+1):t,])
+  if(sum(is.na(train.set$Close)) > 0) next
+  ma.fast=SMA(train.set$Close, n=param.grid$n.fast[i])
+  ma.slow=SMA(train.set$Close, n=param.grid$n.slow[i])
+  
+  # predict
+  test.set=(data[t+1,])
+  
+  signal=tail(ma.fast,n=1) > tail(ma.slow, n=1) * (1+param.grid$threshold[i])
+  ret=ifelse(signal, (test.set$Close/test.set$Open-1),0)
+  sharpe.list= c(sharpe.list,ret)
+  }
+  if(length(sharpe.list) > 0) {
+  sharpe.ratio= mean(sharpe.list)/sd(sharpe.list)
+  if (sharpe.ratio > best.sharpe) {
+    best.sharpe=sharpe.ratio
+    best.params= param.grid[i,]
+  }
+  }
+}
+cat("Лучшие параметры:\n")
+print(best.params)
+```
+оптимальная комбинация:
+
+n.fast = 5 (короткая SMA за 5 дней)
+
+n.slow = 50 (длинная SMA за 50 дней)
+
+threshold = 0.01 (порог в 1% для генерации сигнала)
+
+```{r message=FALSE, warning=FALSE}
+# Logistic Regression
+library(glmnet)
+attach(data)
+sum(is.na(Close))
+# Создаем признаки: SMA_fast, SMA_slow, RSI, etc.
+features <- data.frame(
+  SMA.fast = SMA(data$Close, 5),
+  SMA.slow = SMA(data$Close, 20),
+  RSI = RSI(data$Close, 14)
+)
+attach(features)
+sum(is.na(SMA.fast))
+sum(is.na(SMA.slow))
+sum(is.na(RSI))
+features=features[-c(1:20),]
+dim(features)
+# Метка: 1 если цена выросла на следующий день
+labels <- ifelse(data$Close > data$Open, 1, 0)
+
+# # Обучение модели
+# lr.fit <- glm(labels ~ ., data = features, family = binomial)
+# summary(lr.fit)
+# # Предсказание вероятностей
+# lr.predict <- predict(model, type = "response")
+# summary(lr.predict)
+
+```
+sma binary margin classifier
+```{r sma binary margin classifier}
+window.size=126
+# Hyperparameter Grid
+param_grid <- expand.grid(
+  n_fast = c(5, 10),
+  n_slow = c(20, 50),
+  threshold = c(0.005,0.01)
+)
+
+# Initialize best parameters
+best_sharpe <- -Inf
+best_params <- NULL
+performance_metrics <- list()
+
+for (i in 1:nrow(param_grid)) {
+  returns <- numeric(0)
+  signals_pred <- numeric(0)
+  signals_true <- numeric(0)
+  
+  for (t in window.size:(nrow(data)-1)) {
+    # 1. Извлечение признаков
+    train_set <- data[(t-window.size+1):t, ]
+    ma_fast <- SMA(train_set$Close, n = param_grid$n_fast[i])
+    ma_slow <- SMA(train_set$Close, n = param_grid$n_slow[i])
+    
+    # 2. Генерация сигналов
+    signal_pred <- as.integer(tail(ma_fast, 1) > tail(ma_slow, 1) * (1 + param_grid$threshold[i]))
+    signals_pred <- c(signals_pred, signal_pred)
+    
+    # 3. Реализованная доходность
+    ret <- ifelse(signal_pred == 1, (data$Close[t+1] / data$Open[t+1] - 1), 0)
+    returns <- c(returns, ret)
+    
+    # 4. Добавление истинных меток (исправление ошибки)
+    signal_true <- as.integer(data$Close[t+1] > data$Open[t+1])
+    signals_true <- c(signals_true, signal_true)
+  }
+  
+  # Очистка данных от NA (теперь векторы одинаковой длины)
+  valid_idx <- complete.cases(signals_pred, signals_true)
+  signals_pred_clean <- signals_pred[valid_idx]
+  signals_true_clean <- signals_true[valid_idx]
+
+  # metrics
+  if (length(returns) > 1) {
+    # Sharpe Ratio (Risk-adjusted return)
+    sharpe_ratio <- mean(returns) / sd(returns)
+    
+    # Classification Metrics
+conf_matrix <- table(
+  Predicted = signals_pred_clean,
+  Actual = signals_true_clean
+)
+# Метрики
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])  # TP / (TP + FP)
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])     # TP / (TP + FN)
+specificity <- conf_matrix[1, 1] / sum(conf_matrix[, 1]) # TN / (TN + FP)
+
+    # Save Results
+    performance_metrics[[i]] <- data.frame(
+      param_grid[i, ],
+      sharpe_ratio = sharpe_ratio,
+      precision = precision,
+      recall = recall,
+      accuracy = accuracy
+    )
+    
+    # Update Best Params
+    if (sharpe_ratio > best_sharpe) {
+      best_sharpe <- sharpe_ratio
+      best_params <- param_grid[i, ]
+    }
+  }
+}
+
+# Print Best Results
+# Вывод
+cat("Confusion Matrix:\n")
+print(conf_matrix)
+cat("\nAccuracy:", accuracy,
+    "\nPrecision:", precision,
+    "\nRecall (Sensitivity):", recall,
+    "\nSpecificity:", specificity)
+
+cat("Best Parameters:\n")
+print(best_params)
+cat("\nPerformance Metrics:\n")
+print(do.call(rbind, performance_metrics))
+```
+Accuracy	(TP + TN) / Все	Общая точность сигналов.
+Precision	TP / (TP + FP)	% сигналов "покупать", которые принесли прибыль.
+Recall	TP / (TP + FN)	% прибыльных дней, которые были предсказаны.
+Specificity	TN / (TN + FP)	% убыточных дней, правильно пропущенных.
+
+лучший результат бинарного margin classifier на основе детерминировано правила SMA(5)>SMA(50) threshold 0.005
+
