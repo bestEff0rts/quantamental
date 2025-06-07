@@ -1,0 +1,109 @@
+---
+title: "CLA(critical line a Markowitz)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+*пример 1*
+```{r cla, warning=TRUE}
+library(CLA)
+data(muS.sp500)
+# fix(muS.sp500)
+set.seed(1)
+iS <- sample.int(length(muS.sp500$mu), 24)
+CLsp.24 <- CLA(muS.sp500$mu[iS], muS.sp500$covar[iS, iS], lB=0, uB=1/10)
+CLsp.24 
+plot(CLsp.24)
+
+if(require(Matrix)) { ## visualize how weights change "along turning points"
+  show(image(Matrix(CLsp.24$weights_set, sparse=TRUE),
+             main = "CLA(muS.sp500 <random_sample(size=24)>) $ weights_set",
+             xlab = "turning point", ylab = "asset number"))
+}
+
+## A 3x3 example where CLA()'s original version failed and check.f = TRUE' produces a warning :
+mc3 <- list(
+    mu = c(0.0408, 0.102, -0.023),
+    cv = matrix(c(0.00648, 0.00792, 0.00473,
+                  0.00792, 0.0334,  0.0121,
+                  0.00473, 0.0121, 0.0793), 3, 3,
+           dimnames = list(NULL,
+                           paste0(c("TLT", "VTI","GLD"), ".Adjusted"))))
+
+rc3 <- with(mc3,  CLA(mu=mu, covar=cv, lB=0, uB=1, trace=TRUE))
+
+```
+## data gen( time series correlated variables)
+```{r}
+# Функция для генерации коррелированных временных рядов
+generate_correlated_ts <- function(nObs, size0, size1, mu0=0, sigma0=1, sigma1F=0.5, sLength=100) {
+# 1) Генерация случайных некоррелированных данных# Каждая строка - это переменная (временной ряд)
+  x <- matrix(rnorm(nObs * size0, mean=mu0, sd=sigma0), nrow=nObs, ncol=size0)
+  #2) Создание корреляции между переменными
+  # Выбираем случайные колонки для создания корреляции
+  cols <- sample(1:size0, size1, replace=TRUE)
+  # новые коррелированные переменные
+  y <- x[, cols] + matrix(rnorm(nObs * size1, mean=0, sd=sigma0*sigma1F), 
+                         nrow=nObs, ncol=size1)
+  x <- cbind(x, y)
+  # общий случайный шок
+  point <- sample(sLength:(nObs-1), 2)
+  x[point[1], c(cols[1], size0+1)] <- c(-0.5, -0.5)
+  x[point[2], c(cols[1], size0+1)] <- c(2, 2)
+  # специфический случайный шок
+  point <- sample(sLength:(nObs-1), 2)
+  x[point[1], cols[length(cols)]] <- -0.5
+  x[point[2], cols[length(cols)]] <- 2
+# Возвращаем матрицу данных и индексы колонок с корреляцией
+  return(list(data=x, cor_cols=cols))
+}
+
+nObs <- 500    # Количество наблюдений
+size0 <- 5     # Количество исходных переменных
+size1 <- 3     # Количество коррелированных переменных для добавления
+
+# Генерация данных
+set.seed(123) 
+result <- generate_correlated_ts(nObs, size0, size1)
+names(result)
+x <- result$data
+cols <- result$cor_cols
+# fix(cols)
+```
+
+```{r}
+# Визуализация нескольких рядов
+par(mfrow=c(2, 2))
+plot(x[, 1], type="l", main="Исходный ряд 1", ylab="Значение")
+plot(x[, size0+1], type="l", main="Коррелированный ряд 1", ylab="Значение")
+plot(x[, cols[1]], type="l", main="Ряд с общим шоком", ylab="Значение")
+plot(x[, cols[length(cols)]], type="l", main="Ряд со специфическим шоком", ylab="Значение")
+
+```
+
+
+```{r}
+# Проверка корреляции
+cor.matrix <- cor(x)
+print("Корреляционная матрица (первые 10 переменных):")
+print(cor.matrix[1:min(10, ncol(x)), 1:min(10, ncol(x))])
+
+```
+
+*1* CLA(markowitz)
+```{r}
+library(CLA)
+# mu=c(0.02,-0.03,0.04, 0.01, -0.01, 0.03, 0.055, 0.003)
+# CLA::CLA(mu=mu,covar=cor.matrix, lB=0, uB=1)
+# CLA::CLA(mu=mu,covar=cor.matrix, lB=0, uB=1)$weights
+# CLA::muSigmaGarch()
+
+cla1 <- CLA(muS.sp500$mu[iS], muS.sp500$covar[iS, iS], lB=0, uB=1/10)
+cla1 
+names(cla1)
+cla1$weights_set
+plot(cla1)
+
+```
