@@ -1,0 +1,190 @@
+---
+title: "Регрессия временных рядов: CAPM(регрессия доходности аĸции на доходность рынĸа)"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(quantmod)
+library(lmtest)
+library(PerformanceAnalytics)
+library(tidyverse)
+library(sandwich)
+
+
+```
+##Регрессия акций AAPL на индекс S&P500
+
+```{r}
+getSymbols(c("AAPL", "^GSPC"), src = "yahoo", from = "2015-01-01", to = "2023-01-01")
+
+df <- merge(dailyReturn(AAPL, type = "log"), dailyReturn(GSPC, type = "log")) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Date") %>%
+  as_tibble() %>%
+  rename(Apple = daily.returns, SP500 = daily.returns.1) %>%
+  mutate(Date = as.Date(Date))
+# fix(df)
+
+
+str(df)
+```
+визуализация данных
+```{r}
+ggplot(df, aes(x = Date)) +
+  geom_line(aes(y = Apple, color = "Apple"), linewidth = 0.5, alpha = 0.8) +
+  geom_line(aes(y = SP500, color = "S&P 500"), linewidth = 0.5, alpha = 0.8) +
+  labs(title = "Daily Returns: Apple vs S&P 500 (2015-2022)", y = "Return", color = NULL) +
+  scale_color_manual(values = c("Apple" = "red", "S&P 500" = "blue")) +
+  theme_minimal() +
+  theme(legend.position = "top")  
+```
+Разделение данных train test
+```{r}
+split_date <- df$Date[floor(0.8 * nrow(df))]
+train.d <- filter(df, Date <= split_date)
+test.d <- filter(df, Date > split_date)
+str(train.d)
+dim(train.d)+dim(test.d)
+
+library(roll)
+library(zoo)
+window_size <- 252  # примерно 1 год торговых дней
+n <- nrow(df)
+#скользящая регрессия: fit CAPM для каждого окна
+rolling.fit <- roll_lm(
+  x = as.matrix(df$SP500),
+  y = as.matrix(df$Apple),
+  width = window_size)
+
+betas <- rolling.fit$coefficients[, 2]
+alphas <- rolling.fit$coefficients[, 1]
+```
+Обучение модели линейной регрессии временных рядов train data
+```{r}
+
+capm.fit <- lm(Apple ~ SP500, data = train.d)
+summary(capm.fit)
+confint(capm.fit)
+
+camp.poly.fit<- lm(Apple~ I(SP500^2), data=df)
+summary(camp.poly.fit)
+```
+Прогнозирование
+```{r}
+capm.pred<-predict(capm.fit, newdata=test.d)
+test.d$pred <- predict(capm.fit, newdata = test.d)
+
+# Оценка качества (MSE, R² на тест data)
+mse <- mean((test.d$Apple - test.d$pred)^2)
+r2.test <- cor(test.d$Apple, test.d$pred)^2
+
+cat("Test MSE:", mse, "\nTest R²:", r2.test)
+
+```
+Диагностика модели
+```{r}
+# Графики остатков
+plot(capm.fit)
+
+# Тест на автокорреляцию (Дарбина-Уотсона)
+dwtest(capm.fit)
+
+# Тест на гетероскедастичность (Бреуша-Пагана)
+bptest(capm.fit)
+
+
+# Оценка модели с поправкой Newey-West
+coeftest(capm.fit, vcov = NeweyWest(capm.fit, lag = 6))  # lag можно подобрать
+```
+Durbin-Watson test
+H0: Нет автокорреляции остатков.
+H1: Положительная автокорреляция (остатки зависят от предыдущих).
+вывод:
+DW < 2 (и p-value < 0.05): Есть положительная автокорреляция
+
+
+studentized Breusch-Pagan test
+H0: Гомоскедастичность (постоянная дисперсия остатков).
+H1: Гетероскедастичность
+вывод:
+p-value < 0.05 → Отклоняется нулевая гипотеза о гомоскедастичности.
+Пробуем оценить модели с поправкой Newey-West, преобразования(Логарифмирование: log(abs(returns) + 1)) или weighted least squares(Взвешенная регрессия)
+```{r newey west}
+library(caret)
+#Функция для расчета MSE с заданным lag
+calculate_mse <- function(lag, train_data, test_data) {
+  model <- lm(Apple ~ SP500, data = train_data)
+  predictions <- predict(model, newdata = test_data)
+  mse <- mean((test_data$Apple - predictions)^2)
+  return(mse)
+}
+lags <- 1:10 #претенденты для lag
+#Time Series Cross-Validation
+time_slices <- createTimeSlices(1:nrow(df), initialWindow = 1000, horizon = 252, fixedWindow = FALSE)
+mse_values <- sapply(lags, function(lag) {
+  mse <- mean(sapply(time_slices$train, function(idx) {
+    train <- df[idx, ]
+    test <- df[-idx, ]
+    calculate_mse(lag, train, test)
+  }))
+  return(mse)
+})
+#оптимальный lag
+optimal_lag <- lags[which.min(mse_values)]
+cat("Optimal lag for Newey-West:", optimal_lag)
+#оценка модели с оптимальным lag
+library(sandwich)
+library(lmtest)
+
+capm.fit <- lm(Apple ~ SP500, data = df)
+nw_vcov <- NeweyWest(capm.fit, lag = optimal_lag) 
+coeftest(capm.fit, vcov = nw_vcov)
+```
+интерпретация 
+α = 0 не отвергается (p=0.1762 > 0.05). Акция не показывает значимой избыточной доходности (α) после учета рыночного риска.
+β = 1.21 значимо отличается от 0 (p ≈ 0). Акция более волатильна, чем рынок (β > 1).
+
+Тест Чоу
+```{r}
+library(strucchange)
+sctest(Apple ~ SP500, data = df, type = "Chow", point = 0.5)
+```
+интерпретация: есть ли структурный сдвиг в регрессионной модели в выбранной точке?
+(H₀): Нет структурного изменения (модель стабильна на всём периоде).
+(H₁): Есть структурный сдвиг (параметры α и β изменились в определённой точке)
+p-value = 0.3644 > 0.05 → Не отвергается H₀.
+Вывод: Нет статистически значимых доказательств структурного сдвига в CAPM модели для акции Apple в тестируемой точке.
+
+Кумулятивный тест (CUSUM):
+```{r}
+# jpeg(file="chh.jpeg")
+plot(efp(Apple ~ SP500, data = df, type = "OLS-CUSUM"))
+# dev.off()
+```
+Проверяет постепенные изменения параметров. Колебания внутри границ-модель стабильна
+
+ Визуализация регрессии
+```{r}
+ggplot(df, aes(x = SP500, y = Apple)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "CAPM Regression: Apple vs S&P 500",
+       x = "S&P 500 Returns", 
+       y = "Apple Returns") +
+  theme_minimal()
+```
+Интерпретация результатов
+```{r}
+cat("Alpha (intercept):", coef(capm.fit)[1], "\n")
+cat("Beta (slope):", coef(capm.fit)[2], "\n")
+
+#R^2
+rsq <- summary(capm.fit)$r.squared
+cat("R-squared:", rsq, "\n")
+
+#Tracking Error (sd residuals=стандартное отклонение остатков)
+tracking_error <- sd(residuals(capm.fit))
+cat("Tracking Error:", tracking_error, "\n")
+```
+
