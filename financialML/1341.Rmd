@@ -1,0 +1,263 @@
+---
+title: "Моделирование доходности: регрессия(lm,gam-splines;ns), eGARCH, риск-менеджмент(EVT, VaR, ES)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Цель: Оценить влияние изменения валютного курса на доходность актива (например, акции компании-экспортёра Газпром (GAZP) – доходность в RUB, но выручка в USD)
+$R~i,t=\alpha~i+\beta~iΔFX~t+\epsilon~i,t $
+$R~i,t$-доходность актива i в момент t;
+$ΔFX~t$-изменение валютного курса (например, RUB/USD)
+
+Загрузка данных
+```{r warning=FALSE}
+library(quantmod)
+getSymbols(c("GAZP.ME", "USDRUB=X","DXY","BZ=F","CPI","IMOEX.ME"), from = "2020-01-01", to = "2025-01-01")
+
+data <- merge(
+  dailyReturn(GAZP.ME,type = "log"),       # Доходность Газпрома
+  dailyReturn( `USDRUB=X`,type = "log") , 
+  dailyReturn(DXY, type="log"), 
+  dailyReturn( `BZ=F`,type = "log"),          # Нефть Brent
+  dailyReturn(IMOEX.ME,type = "log"),      
+  dailyReturn(CPI,type="log"),
+na.omit(diff(log(Cl(GAZP.ME))))
+)
+df<-as.data.frame(data)
+# str(df)
+# dim(data)
+
+colnames(df) <- c("gazp.me", "FX","DXY","brent","imoex","cpi","log.returns")
+
+# df <- na.omit(df)
+df<- as.data.frame(df)
+str(df)
+library(zoo)
+df.locf <- na.locf(df, na.rm = FALSE)
+df.locf <- na.trim(df.locf)
+str(df.locf)
+```
+Разделим данные для обучения моделей на тренировочных данных, и прогнозирования на тестовых
+```{r train test split}
+n <- nrow(df.locf)
+train_size <- floor(0.8 * n)
+train <- df.locf[1:train_size, ]
+str(train)
+test <- df.locf[(train_size + 1):n, ]
+str(test)
+```
+
+```{r}
+library(rugarch)
+attach(df.locf)
+sum(is.na(log.returns)) 
+sum(is.infinite(log.returns))
+# log.returns_clean <- log.returns[is.finite(log.returns)]  # Удаление Inf/NaN
+# log.returns_clean <- na.omit(log.returns_clean)  # Удаление NA
+str(df.locf)
+# acf(log.returns)
+
+spec<-ugarchspec(variance.model=list(model="eGARCH", garchOrder=c(1,1)),
+                 mean.model= list(armaOrder=c(0,0), include.mean=FALSE),
+                 distribution.model="std"
+                 )
+
+fit<- ugarchfit(spec=spec, data=train$log.returns)
+fit
+if (!is.null(fit@fit$sigma)) {
+  volatility <- sigma(fit)
+} else {
+  stop("GARCH-модель не сошлась. Проверьте данные и параметры.")
+}
+
+# volatility<- sigma(fit)
+```
+интерпретация модели eGARCH(1,1)
+Асимметричный эффект (gamma1 > 0): Отрицательные шоки увеличивают волатильность сильнее, чем положительные
+Высокий beta1 (0.793): Волатильность устойчива во времени (долго сохраняется после шоков).
+
+Ljung-Box тест для остатков:
+p-value = 9.7e-08 (Lag[1]) → Есть автокорреляция в остатках
+Ljung-Box тест для квадратов остатков:
+p-value = 0.834 (Lag[1]) = Нет ARCH-эффектов
+ARCH-LM тест:
+p-value > 0.05 = Нет остаточной гетероскедастичности (модель адекватна)
+
+Автокорреляция в остатках: например добавить AR/MA компоненты в mean.model:
+```{r}
+spec2<-ugarchspec(variance.model=list(model="eGARCH", garchOrder=c(1,1)),
+                 mean.model= list(armaOrder=c(1,1), include.mean=FALSE),
+                 distribution.model="std"
+                 )
+fit2<- ugarchfit(spec=spec2, data=train$log.returns)
+fit2
+vol<-sigma(fit2)
+```
+интерпретация: Решена проблема автокорреляции:
+Тест Ljung-Box для стандартизированных остатков: p-value = 0.709 (Lag[1])= Нет автокорреляции (в fit было 9.7e-08). Добавление ARMA(1,1) в mean.model устранило зависимость в остатках.
+shape= 6.489661(degrees of freedom)-"Тяжелые хвосты" (степень свободы t-распределения).
+(эмпирическое распределение стандартизированных остатков близко к t-распределению с 6.49 степенями свободы, указывает на умеренно тяжёлые хвосты (меньше, чем у нормального распределения, но не экстремальные)
+t-value = 6.617, p-value < 0.001 → параметр статистически значим, подтверждает, что нормальное распределение (norm) не подходит
+возможно распределение Гибеля, хотя распределение стьюдента уже неплохо подходит
+
+Тест отношения правдоподобия (Likelihood Ratio Test, LRT) для сравнения fit и fit2
+```{r}
+library(lmtest)
+LR_statistic <- 2 * (likelihood(fit2) - likelihood(fit))  # 2*(LL2 - LL1)
+p_value <- 1 - pchisq(LR_statistic, df = 2)  # fit2 имеет на 2 параметра больше (ar1, ma1)
+
+cat("LR Statistic:", LR_statistic, "\np-value:", p_value)
+
+
+```
+интерпретация на основании теста отношения правдоподобия (LRT):
+LR-статистика = 56.41- большое значение, указывающее на существенное улучшение модели fit2.
+p-value = 5.63e-13 < 0.05 (и даже 0.001) ->отвергается H0 о равенстве качества моделей.
+#Почему fit2 лучше?
+Устранена автокорреляция:
+В fit был значимый Ljung-Box тест (p = 9.7e-08), в fit2 — нет (p = 0.709).
+ARMA(1,1) компенсировала зависимость в среднем.
+Улучшение правдоподобия:
+Log-Likelihood вырос с 3329.619 до 3357.824.
+Разница (28.205) объяснима только добавлением значимых параметров.
+Информационные критерии:
+AIC уменьшился с -5.747 до -5.792
+
+что если проверить распределение ged вместо std
+```{r}
+spec3<-ugarchspec(variance.model=list(model="eGARCH", garchOrder=c(1,1)),
+                 mean.model= list(armaOrder=c(1,1), include.mean=FALSE),
+                 distribution.model="ged"
+                 )
+fit3<- ugarchfit(spec=spec3, data=train$log.returns)
+fit3
+```
+интерпретация: 
+По сравнению с t-распределением (fit2):
+LogLikelihood: 3350.805 (fit3) vs 3357.824 (fit2) → t-распределение лучше
+AIC: -5.780 (fit3) vs -5.792 (fit2) → fit2 предпочтительнее
+По сравнению с ARMA(0,0) (fit):
+Улучшение качества (но хуже, чем fit2)
+
+#применение extreme value theory (EVT) к стандартизированным остаткам eGARCH(fit2)
+```{r}
+# Получаем стандартизированные остатки (z_t = ε_t/σ_t)
+std_resid <- residuals(fit2, standardize = TRUE)
+threshold_upper <- quantile(std_resid, 0.95)  # Для положительных экстремумов
+threshold_lower <- quantile(std_resid, 0.05)  # Для отрицательных
+library(POT)
+
+# Для верхнего хвоста
+pot_upper <- fitgpd(std_resid, threshold = threshold_upper, est = "mle")
+
+# Для нижнего хвоста (берем модуль значений)
+pot_lower <- fitgpd(-std_resid, threshold = -threshold_lower, est = "mle")
+summary(pot_upper)
+
+```
+интерпретация: shape = -0.08154 , значит, что распределение хвостов близко к экспоненциальному с верхней границей. Формула для VaR должна быть скорректирована.
+
+Value at Risk и Conditional Value at Risk(ES)
+```{r}
+library(POT)
+
+# Подгонка модели
+pot_upper <- fitgpd(std_resid, threshold = threshold_upper, est = "mle")
+
+# Извлечение параметров
+scale_param <- pot_upper$param["scale"]
+shape_param <- pot_upper$param["shape"]
+
+# Расчет рисков
+alpha <- 0.99
+if (shape_param > 0) {
+  var_upper <- threshold_upper + (scale_param/shape_param) * 
+               (((1-alpha)/pot_upper$pat)^(-shape_param) - 1)
+} else {
+  var_upper <- threshold_upper + (scale_param/abs(shape_param)) * 
+               (1 - ((1-alpha)/pot_upper$pat)^(-abs(shape_param)))
+}
+
+print(paste("99% VaR:", round(var_upper, 4)))
+
+```
+
+
+```{r}
+alpha <- 0.99
+
+threshold <- pot_upper$threshold  # Порог (95% квантиль = 1.62)
+n_exceed <- sum(std_resid > threshold)  # Число превышений (58)
+p_exceed <- n_exceed / length(std_resid)  # Доля превышений (0.0501)
+
+# ES (Conditional VaR)
+es_upper <- var_upper / (1 - abs(pot_upper$param["shape"])) + 
+            (pot_upper$param["scale"] - abs(pot_upper$param["shape"]) * threshold_upper) / 
+            (1 - abs(pot_upper$param["shape"]))
+var_upper
+es_upper
+```
+Для риск-менеджмента:
+Подготовить капитал, покрывающий средний экстремальный убыток в 1.038041σ.
+Как вычислялся ES?
+Использовалась формула для GPD (Generalized Pareto Distribution) с параметрами:
+scale (σ) = 0.7068
+shape (ξ) = 0.0976
+Threshold (u) = 95%-квантиль (1.62 стандартных отклонения)
+
+
+предикторы:
+USD/RUB – базовый предиктор.
+Индекс доллара (DXY) – глобальный риск.Цены на нефть (Brent)
+Инфляция (CPI РФ и США)
+
+Волатильность рубля.
+Спред процентных ставок (Ставка ЦБ – Ставка ФРС)
+
+Волатильность USD/RUB (GARCH-модель или стандартное отклонение за 30 дней)
+Отклонение курса от скользящего среднего (например, USD/RUB – MA(50))
+Спред между спотом и NDF (Non-Deliverable Forwards) – индикатор давления на рубль
+
+FIT models
+```{r}
+names(df.locf)
+lr.fit=lm(gazp.me~., data=train)
+summary(lr.fit)
+library(car)
+vif(lr.fit) #variance inflation factors
+
+summary(lm(gazp.me~brent+imoex+log.returns, data=train))
+
+summary(lm(gazp.me~FX+ log.returns*vol, data = train))
+summary(lm(gazp.me~FX+ log.returns+vol, data = train))
+
+```
+Adjusted R-squared:      1 - переобучение
+
+generalized additive models
+```{r}
+library(gam)
+gam.fit <-gam(gazp.me~s(imoex) + s(brent) + s(log.returns),
+ data = train)
+gam.fit2=gam(gazp.me~ns(imoex)+ns(brent)+ns(log.returns), data=train)
+anova(gam.fit,gam.fit2) 
+plot(gam.fit, se = TRUE, col = "blue")
+```
+s,df-smoothing spline; ns,df-natural spline
+
+Диагностика модели
+```{r}
+library(lmtest)
+library(sandwich)
+dwtest(lr.fit)
+bptest(lr.fit)
+# coeftest(lr.fit, vco= NeweyWest)
+```
+Автокорреляция: Тест Дарбина-Уотсона (dwtest(model)).
+
+Гетероскедастичность: Тест Бреуша-Пагана (bptest(model)).
+
+Устойчивые ошибки: Newey-West (coeftest(model, vcov = NeweyWest)).
