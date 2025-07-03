@@ -1,42 +1,33 @@
-ML + econometrics
+данный проект охватывает ключевые концепции машинного обучения и statistical learning с элементами мат статистики и эконометрики
+и предлагает свежий взгляд на имплеменатцию financial machine learning на Python и R.
 
-1- Ridge Lasso Elastic-Net Regression(Regularisation, Shrinkage methods- Методы сжатия)
-Ridge Regression (L2 Norm)- small sample sizes meaning Least Squares not applicable; introduces small ammount of bias for a significant drop in variance for better long-term predictions
-Ridge Penalty: minimizes SSR+ lambda x (slope)^2
-Assimptotocally to zero, i.e. cannot remove factors; 
-When Ridge Regression is applied to Logistic Regression, it optimizes the sum of the likelihoods not ssr(sum of squared residuals); also type.measure= deviance not mse and family= not gaussian but binomial
-For complex models combining 2 or more datasets Ridge Regression penalty contains parameters for the slope^2 and all the parameters^2 except for y-intercept (it's not scaled by the measurements- that's why y-intercept not included into the Ridge penalty)
+python - Tensorflow/Keras, Statsmodels, mlfinlab, Pandas, NumPy, Scikit-Learn, XGBoost, yfinance
+R- glm, e1071, MASS, splines, randomForest, gam, tseries, caret, boot, PortfolioAnalytics, forecast
 
-// Гребневая регрессия (L2 Norm)-коррекция для снижения мультиколлинеарности среди предикторов, при неэффективности МНК; дает смещенные оценки но с меньшей дисперсией, вводит небольшую степень отклонения для значительного снижения вариации в целях улучшения долгосрочных прогнозов= увеличивает эффективность оценок
-Штраф: минимизирует SSR + lambda x (slope)^2
-Ассиимптотично стремится к 0, т.е. не может удалить факторы
-Когда регрессия Ridge применяется к логистической регрессии, она оптимизирует сумму вероятностей не ssr (сумма квадратичных остатков)
-Для сложных моделей, объединяющих 2 или более наборов данных, содержит параметры для slope^2 и всех параметров^2 за исключением у-intercept (не масштабируется по измерениям)
+модели: 
+Deep Learning : Sequential models(RNN, LSTM, TCN,  CNN) ; Reinforcement Learning (Deep Q-Networks, Q-Learning)
 
-Lasso(L1 Norm) Regression
-может удалить предиктор
-Minimizes: SSR + lambda*|slope|
+Регрессия: OLS множественная линейная регрессия, polynomial regression, регрессия с interaction effects, обобщенные аддитивные модели(generalized additive models)
 
-Elastic-Net Regression- separate lambdas for each penalty(L1;L2) -calculated using CV(cross validation))- different combinations
-=L1+L2 Penalty
-lambda1=1 lambda2=0 Lasso (pick 1 correlated predictor and eliminate others)
-lambda1=0 lambda2=1 Ridge (shrinks all the correlated paaremters together)
-lambda1>0 lambda2>0 Elastic-Net (groups and shrinks correlated variables' parameters and leaves them in equation or removes them all at once)
-Источники: Elements of Statistical Learning Hastie; Introduction to statistical learning in R
+сплайны: regression splines, cubic and natural splines 
 
-library(glmnet) #generalized linear models
-cv glmnet- lambda*[alpha*Lasso Penalty+(1-alpha)*Ridge Penalty]
-alpha=0 Only Ridge; alpha=1 Only Lasso
-0<alpha<1 Elastic Net Regression
-Lambda=0 Least Squares/Maximum Likelihood
-Test different values for lambda and alpha
+support vector machines, support vector classifier с ядрами: radial basis kernel, linear kernel
 
-10-Fold Cross Validation - default but 
-(Purged K-Fold CV:
-Разбиваем данные на K блоков по времени
-Добавляем "очищающий" период (purged) между train и test)
-[ Train Fold 1 ] | [ Purge ] | [ Test Fold 1 ] |........ [ Test Fold k] 
+регуляризация: lasso, ridge, elastic-net, partial least squares regression(supervised аналог pca), early stopping(neural networks)
 
-\\\\\\Добавление визуализации
-Lasso может обнулить фактор(предиктор) то есть его исключить, Ridge- нет
-При построении графика x-axis slope values; y-axis- penalty; Ridge- парабола с преломлением в нуле при увеличении lambda; Lasso- нет преломления в нуле
+методы снижения размерности признакового пространства(dimension reduction): pca, pls, lda, qda
+
+классификаторы: logistic regression, naive Bayes
+tree-based: bart(bayesian additive regression trees), random forests, decision trees, boosting, bagging
+ансамбли: xgboost, adaboost, gradient boost
+
+unsupervised learning: KNN clustering, Hierarchial clustering, DBSCAN, Isolation Forest
+Non parametric: monte carlo simultion, mcmc (Monte Carlo Markov Chains)
+
+эконометирика: arima, garch, adf augmented dickey fuller тест на стационарность, Granger Casuality Test
+
+risk managment: Var, CVar, EVT (extreme value theorem)
+
+portfolio managment: cla(markowitz efficient frontier), capm, cot(commitments of traders) data 
+
+(Список литературы: afml, islp)
