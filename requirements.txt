@@ -7,7 +7,8 @@ scipy==1.10.0
 
 === ML ===
 scikit-learn==1.2.0
-tensorflow==2.11.0
+tensorflow-cpu==2.11.0 ; sys_platform != 'darwin'  # Для Windows/Linux
+tensorflow-macos==2.11.0 ; sys_platform == 'darwin'  # Для Mac M1
 catboost==1.0.0
 xgboost==1.7.0
 
