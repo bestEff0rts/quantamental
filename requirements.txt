@@ -5,7 +5,6 @@ scikit-learn==1.2.0
 tensorflow-cpu==2.11.0 
 catboost==1.0.0
 xgboost>=1.7.0,<2.0.0
-mlfinlab==1.0.0 
 yfinance==0.2.18
 statsmodels==0.13.5
 arch==5.3.0 
