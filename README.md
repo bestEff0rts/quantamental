@@ -1,3 +1,5 @@
+Quantamental Research: Financial ML & Statistical Learning
+
 [![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)](https://www.python.org/)
 [![R](https://img.shields.io/badge/R-4.0+-blue?logo=r)](https://www.r-project.org/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -44,3 +46,8 @@ portfolio managment: cla(markowitz efficient frontier), capm, cot(commitments of
 Как склонировать репозиторий  
 ```bash
 git clone https://github.com/bestEff0rts/quantamental.git
+```
+Установка
+```bash
+pip install -r requirements.txt
+```
