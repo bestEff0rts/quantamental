@@ -31,3 +31,12 @@ risk managment: Var, CVar, EVT (extreme value theorem)
 portfolio managment: cla(markowitz efficient frontier), capm, cot(commitments of traders) data 
 
 (Список литературы: afml, islp)
+
+##Моя активность на GitHub  
+[Stats](https://github-readme-stats.vercel.app/api?username=bestEff0rts&show_icons=true&theme=radical)  
+
+[Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=bestEff0rts&layout=compact)  
+
+Как склонировать репозиторий  
+```bash
+git clone https://github.com/bestEff0rts/quantamental.git
