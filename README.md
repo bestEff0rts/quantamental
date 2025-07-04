@@ -1,3 +1,7 @@
+[![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)](https://www.python.org/)
+[![R](https://img.shields.io/badge/R-4.0+-blue?logo=r)](https://www.r-project.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
 данный проект охватывает ключевые концепции машинного обучения и statistical learning с элементами мат статистики и эконометрики
 и предлагает свежий взгляд на имплеменатцию financial machine learning на Python и R.
 
