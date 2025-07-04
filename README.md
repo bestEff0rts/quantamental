@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Tests](https://github.com/bestEff0rts/quantamental/actions/workflows/python-tests.yml/badge.svg)](https://github.com/bestEff0rts/quantamental/actions)
 
+
 данный проект охватывает ключевые концепции машинного обучения и statistical learning с элементами мат статистики и эконометрики
 и предлагает свежий взгляд на имплеменатцию *financial machine learning* на Python и R.
 
